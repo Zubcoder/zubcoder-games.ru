@@ -229,6 +229,11 @@ html, body {
   color: var(--accent-light);
 }
 
+.stats-sep {
+  color: var(--border);
+  font-weight: 400;
+}
+
 .scene-image-container {
   position: relative;
   width: 100%;
