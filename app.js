@@ -11,7 +11,9 @@
     flags: {
       chapter: 1,
       location: 'Начало пути',
-      game_started: false
+      game_started: false,
+      money: 0,
+      health: 100
     },
     history: []
   };
@@ -32,6 +34,7 @@
     menuItems: document.querySelectorAll('.menu-item[data-target]'),
     locationBar: document.getElementById('location-bar'),
     sceneImage: document.getElementById('scene-image'),
+    sceneImageContainer: document.getElementById('scene-image-container'),
     loader: document.getElementById('loader'),
     sceneText: document.getElementById('scene-text'),
     choices: document.getElementById('choices'),
@@ -40,7 +43,16 @@
     inventoryList: document.getElementById('inventory-list'),
     historyPanel: document.getElementById('history-panel'),
     historyList: document.getElementById('history-list'),
-    toast: document.getElementById('error-toast')
+    toast: document.getElementById('error-toast'),
+    statsBar: document.getElementById('stats-bar'),
+    moneyStat: document.getElementById('money-stat'),
+    healthStat: document.getElementById('health-stat'),
+    commandInput: document.getElementById('command-input'),
+    commandBtn: document.getElementById('command-btn'),
+    duelPanel: document.getElementById('duel-panel'),
+    duelInsult: document.getElementById('duel-insult'),
+    musicBox: document.getElementById('music-box'),
+    musicLink: document.getElementById('music-link')
   };
 
   function saveState() {
@@ -60,7 +72,7 @@
         const parsed = JSON.parse(saved);
         state.session_id = parsed.session_id || '';
         state.inventory = parsed.inventory || [];
-        state.flags = parsed.flags || { chapter: 1, location: 'Начало пути', game_started: false };
+        state.flags = parsed.flags || { chapter: 1, location: 'Начало пути', game_started: false, money: 0, health: 100 };
       } catch (e) {
         console.error(e);
       }
@@ -78,7 +90,7 @@
   function resetGame() {
     state.session_id = '';
     state.inventory = [];
-    state.flags = { chapter: 1, location: 'Начало пути', game_started: false };
+    state.flags = { chapter: 1, location: 'Начало пути', game_started: false, money: 0, health: 100 };
     state.history = [];
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(HISTORY_KEY);
@@ -105,6 +117,14 @@
     } else {
       els.loader.classList.add('hidden');
     }
+  }
+
+  function renderStats() {
+    const money = state.flags.money || 0;
+    const health = state.flags.health || 100;
+    els.moneyStat.textContent = `💰 ${money}`;
+    els.healthStat.textContent = `❤️ ${health}/100`;
+    els.statsBar.classList.remove('hidden');
   }
 
   function renderInventory() {
@@ -134,7 +154,7 @@
     els.historyPanel.classList.remove('hidden');
   }
 
-  function renderChoices(choices) {
+  function renderChoices(choices, isDuel) {
     els.choices.innerHTML = '';
     if (!choices || choices.length === 0) {
       const btn = document.createElement('button');
@@ -148,9 +168,15 @@
       const btn = document.createElement('button');
       btn.className = 'choice-btn';
       const num = index + 1;
-      const text = choice.replace(/^\d+\.\s*/, '');
+      const text = String(choice).replace(/^\d+\.\s*/, '');
       btn.innerHTML = `<span class="num">${num}.</span> ${escapeHtml(text)}`;
-      btn.onclick = () => makeChoice(text);
+      btn.onclick = () => {
+        if (isDuel) {
+          handleDuelChoice(index, text);
+        } else {
+          makeChoice(text);
+        }
+      };
       els.choices.appendChild(btn);
     });
   }
@@ -159,6 +185,21 @@
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  function handleDuelChoice(index, text) {
+    const correctIndex = state.lastDuelCorrectIndex;
+    if (correctIndex !== undefined && index === correctIndex) {
+      state.flags.money = (state.flags.money || 0) + 10;
+      showToast('Отличный ответ! +10 монет');
+    } else {
+      state.flags.health = Math.max(0, (state.flags.health || 100) - 15);
+      showToast('Промах! -15 здоровья');
+    }
+    state.lastDuelCorrectIndex = undefined;
+    state.lastDuelInsult = undefined;
+    els.duelPanel.classList.add('hidden');
+    callApi(`Ответить: ${text}`);
   }
 
   async function callApi(action) {
@@ -222,7 +263,29 @@
       setLoading(false);
     }
 
-    renderChoices(data.choices);
+    if (data.image_type) {
+      els.sceneImageContainer.className = `scene-image-container ${data.image_type}`;
+    }
+
+    if (data.music_url) {
+      els.musicLink.href = data.music_url;
+      els.musicBox.classList.remove('hidden');
+    } else {
+      els.musicBox.classList.add('hidden');
+    }
+
+    if (data.duel_choices && data.duel_choices.length > 0) {
+      state.lastDuelCorrectIndex = data.duel_correct_index;
+      state.lastDuelInsult = data.duel_insult;
+      els.duelInsult.textContent = data.duel_insult || 'Тебе бросили вызов!';
+      els.duelPanel.classList.remove('hidden');
+      renderChoices(data.duel_choices, true);
+    } else {
+      els.duelPanel.classList.add('hidden');
+      renderChoices(data.choices, false);
+    }
+
+    renderStats();
     renderInventory();
     saveState();
     renderHistory();
@@ -239,6 +302,22 @@
     callApi(action);
   }
 
+  function handleCommand() {
+    const text = els.commandInput.value.trim();
+    if (!text) return;
+    if (/^\d+$/.test(text)) {
+      const num = parseInt(text, 10);
+      const buttons = els.choices.querySelectorAll('.choice-btn');
+      if (buttons[num - 1]) {
+        buttons[num - 1].click();
+        els.commandInput.value = '';
+        return;
+      }
+    }
+    callApi(text);
+    els.commandInput.value = '';
+  }
+
   function init() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
@@ -250,6 +329,7 @@
     els.continueBtn.addEventListener('click', () => {
       if (state.session_id) {
         showScreen('game');
+        renderStats();
         renderInventory();
         renderHistory();
       }
@@ -275,12 +355,21 @@
       els.inventoryPanel.classList.toggle('hidden');
     });
 
+    els.commandBtn.addEventListener('click', handleCommand);
+    els.commandInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleCommand();
+    });
+
     document.addEventListener('keydown', (e) => {
       if (screens.game.classList.contains('hidden')) return;
+      if (document.activeElement === els.commandInput) return;
       const key = parseInt(e.key, 10);
       if (key >= 1 && key <= 5) {
         const buttons = els.choices.querySelectorAll('.choice-btn');
         if (buttons[key - 1]) buttons[key - 1].click();
+      }
+      if (e.key === 'Enter') {
+        els.commandInput.focus();
       }
     });
   }

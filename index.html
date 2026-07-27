@@ -31,7 +31,7 @@
         </div>
         <h2>Казань, 1555 год</h2>
         <p class="tagline">Ты — молодой купец Алёша Солнцев. Случайно ты узнал о легендарном сокровище Золотой Орды, спрятанном в подземельях Казанского Кремля.</p>
-        <p class="subline">Пройди четыре испытания, собери ключи и найди клад раньше соперника — бухарского купца Мусафира.</p>
+        <p class="subline">Пройди четыре испытания, собери ключи, торгуй, дуэлься остроумием и найди клад раньше соперника — бухарского купца Мусафира.</p>
         <div class="actions">
           <button id="start-btn" class="btn btn-primary">Начать путешествие</button>
           <button id="continue-btn" class="btn btn-secondary" disabled>Продолжить</button>
@@ -46,41 +46,67 @@
         <button id="inventory-toggle" class="btn btn-ghost">Инвентарь</button>
       </div>
 
-      <div id="scene-image-container">
+      <div id="stats-bar" class="stats-bar hidden">
+        <span id="money-stat">💰 0</span>
+        <span id="health-stat">❤️ 100/100</span>
+      </div>
+
+      <div id="scene-image-container" class="scene-image-container scene">
+        <div id="loader" class="loader hidden">Генерируем сцену...</div>
         <img id="scene-image" src="" alt="Иллюстрация локации" class="hidden">
-        <div id="loader" class="loader"></div>
+      </div>
+
+      <div id="duel-panel" class="duel-panel hidden">
+        <h3>⚔️ Словесная дуэль</h3>
+        <p id="duel-insult"></p>
       </div>
 
       <div id="scene-text" class="scene-text"></div>
 
-      <div id="inventory-panel" class="hidden">
-        <strong>Инвентарь:</strong>
-        <ul id="inventory-list"></ul>
+      <div id="command-box" class="command-box">
+        <input type="text" id="command-input" placeholder="Введи команду: взять, открыть, поговорить с..." autocomplete="off">
+        <button id="command-btn" class="btn btn-ghost">➤</button>
+      </div>
+
+      <div id="music-box" class="music-box hidden">
+        <a id="music-link" href="#" target="_blank" rel="noopener" class="btn btn-ghost">🎵 Фоновая музыка</a>
       </div>
 
       <div id="choices" class="choices"></div>
 
-      <div id="history-panel" class="hidden">
-        <h3>История</h3>
-        <ul id="history-list"></ul>
+      <div id="inventory-panel" class="panel hidden">
+        <h3>🎒 Инвентарь</h3>
+        <ul id="inventory-list"><li>пусто</li></ul>
+      </div>
+
+      <div id="history-panel" class="panel hidden">
+        <h3>📜 История</h3>
+        <ul id="history-list"><li>История пуста</li></ul>
       </div>
     </section>
 
     <section id="about-screen" class="screen hidden">
-      <h2>Об игре</h2>
-      <p><strong>Тайна Золотой Орды</strong> — браузерная текстовая AI-игра в жанре приключенческого квеста.</p>
-      <p>Разработчик: <strong>Zubcoder Games</strong></p>
-      <p>Тексты и изображения создаются генеративными технологиями. Каждое прохождение может отличаться.</p>
-      <ul class="links">
-        <li><a href="docs/privacy-policy.html">Политика конфиденциальности</a></li>
-        <li><a href="docs/terms-of-service.html">Пользовательское соглашение</a></li>
-      </ul>
-      <button class="back-btn btn btn-secondary">Назад</button>
+      <div class="about">
+        <h2>Об игре</h2>
+        <p><strong>«Тайна Золотой Орды»</strong> — браузерная AI-игра от Zubcoder Games.</p>
+        <p>Действие происходит в Казани 1555 года. Игрок управляет молодым купцом Алёшей Солнцевым, который пытается разгадать тайну сокровища Золотой Орды.</p>
+        <p><strong>Механики:</strong></p>
+        <ul>
+          <li>Четыре ключевых испытания</li>
+          <li>Свободные текстовые команды и горячие клавиши 1–5</li>
+          <li>Деньги, торговля, подкупы</li>
+          <li>Здоровье и словесные дуэли</li>
+          <li>Динамические иллюстрации сцены / NPC / интерьера / дуэли</li>
+          <li>Сохранение прогресса в браузере</li>
+        </ul>
+        <p><a href="docs/privacy-policy.html">Политика конфиденциальности</a></p>
+        <p><a href="docs/terms-of-service.html">Пользовательское соглашение</a></p>
+        <button class="back-btn btn btn-secondary">Назад</button>
+      </div>
     </section>
   </main>
 
   <div id="error-toast" class="toast hidden"></div>
-
   <script src="app.js"></script>
 </body>
 </html>
