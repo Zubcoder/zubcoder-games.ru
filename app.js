@@ -189,12 +189,13 @@
 
   function handleDuelChoice(index, text) {
     const correctIndex = state.lastDuelCorrectIndex;
-    if (correctIndex !== undefined && index === correctIndex) {
-      state.flags.money = (state.flags.money || 0) + 10;
-      showToast('Отличный ответ! +10 монет');
+    const won = correctIndex !== undefined && index === correctIndex;
+    state.flags.duel_won = won;
+    state.flags.duel_answer = text;
+    if (won) {
+      showToast('Отличный ответ!');
     } else {
-      state.flags.health = Math.max(0, (state.flags.health || 100) - 15);
-      showToast('Промах! -15 здоровья');
+      showToast('Промах!');
     }
     state.lastDuelCorrectIndex = undefined;
     state.lastDuelInsult = undefined;
@@ -243,6 +244,8 @@
     if (data.flags_update) {
       Object.assign(state.flags, data.flags_update);
     }
+    delete state.flags.duel_won;
+    delete state.flags.duel_answer;
 
     state.history.push({ location: state.flags.location, action: action });
 
