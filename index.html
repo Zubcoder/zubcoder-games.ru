@@ -11,6 +11,8 @@
   <link rel="icon" href="assets/icon-192.png">
 </head>
 <body>
+  <div class="parallax-bg" aria-hidden="true"></div>
+
   <main id="app">
     <header class="app-header">
       <div class="brand">Zubcoder Games</div>
@@ -43,13 +45,20 @@
     <section id="game-screen" class="screen hidden">
       <div class="scene-header">
         <div id="location-bar">Начало пути</div>
-        <button id="inventory-toggle" class="btn btn-ghost">Инвентарь</button>
+        <div class="scene-actions">
+          <button id="tts-btn" class="icon-btn" aria-label="Озвучить">🔊</button>
+          <button id="share-btn" class="icon-btn" aria-label="Поделиться">➦</button>
+          <button id="audio-btn" class="icon-btn" aria-label="Звук">🔇</button>
+        </div>
       </div>
 
       <div id="stats-bar" class="stats-bar hidden">
         <span id="money-stat">💰 0</span>
         <span class="stats-sep">|</span>
         <span id="health-stat">❤️ 100/100</span>
+        <span class="stats-sep">|</span>
+        <span id="quota-stat">🎫 20</span>
+        <button id="purchase-stub-btn" class="btn btn-mini">+</button>
       </div>
 
       <div id="scene-image-container" class="scene-image-container scene">
@@ -69,10 +78,6 @@
         <button id="command-btn" class="btn btn-ghost">➤</button>
       </div>
 
-      <div id="music-box" class="music-box hidden">
-        <a id="music-link" href="#" target="_blank" rel="noopener" class="btn btn-ghost">🎵 Фоновая музыка</a>
-      </div>
-
       <div id="choices" class="choices"></div>
 
       <div id="inventory-panel" class="panel hidden">
@@ -80,10 +85,22 @@
         <ul id="inventory-list"><li>пусто</li></ul>
       </div>
 
+      <div id="map-panel" class="panel hidden">
+        <h3>🗺️ Карта Казани</h3>
+        <ul id="map-list"></ul>
+      </div>
+
       <div id="history-panel" class="panel hidden">
         <h3>📜 История</h3>
         <ul id="history-list"><li>История пуста</li></ul>
       </div>
+
+      <nav class="bottom-nav">
+        <button id="nav-command" class="nav-item active">⌨️ Команда</button>
+        <button id="nav-inventory" class="nav-item">🎒 Инвентарь</button>
+        <button id="nav-map" class="nav-item">🗺️ Карта</button>
+        <button id="nav-menu" class="nav-item">☰ Меню</button>
+      </nav>
     </section>
 
     <section id="about-screen" class="screen hidden">
@@ -98,6 +115,7 @@
           <li>Деньги, торговля, подкупы</li>
           <li>Здоровье и словесные дуэли</li>
           <li>Динамические иллюстрации сцены / NPC / интерьера / дуэли</li>
+          <li>Озвучка сцен, фоновая атмосфера, share-карточки</li>
           <li>Сохранение прогресса в браузере</li>
         </ul>
         <p><a href="docs/privacy-policy.html">Политика конфиденциальности</a></p>
@@ -107,6 +125,16 @@
     </section>
   </main>
 
+  <div id="purchase-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>🎟️ Доступ к приключению</h3>
+      <p id="purchase-message">Бесплатно доступно 20 сцен. После — выбери удобный вариант.</p>
+      <div id="purchase-list" class="purchase-list"></div>
+      <button id="close-purchase" class="btn btn-secondary">Закрыть</button>
+    </div>
+  </div>
+
+  <canvas id="share-canvas" class="hidden"></canvas>
   <div id="error-toast" class="toast hidden"></div>
   <script src="app.js"></script>
 </body>

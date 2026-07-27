@@ -475,3 +475,232 @@ html, body {
     max-height: 60vh;
   }
 }
+
+.parallax-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url('assets/bg-kremlin.jpg') center/cover no-repeat;
+  transform: scale(1.1);
+  transition: transform 0.2s ease-out;
+  filter: brightness(0.45) sepia(0.3);
+}
+
+#start-screen {
+  background: linear-gradient(180deg, rgba(15,12,8,0.3) 0%, rgba(15,12,8,0.85) 100%);
+}
+
+.hero {
+  backdrop-filter: blur(2px);
+  padding: 24px;
+  border-radius: var(--radius);
+}
+
+.scene-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#tts-btn.speaking {
+  color: var(--primary);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+#audio-btn.active {
+  color: var(--primary);
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  background: var(--surface-2);
+  border-top: 2px solid var(--border);
+  padding-bottom: var(--safe-bottom);
+  z-index: 90;
+}
+
+.nav-item {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 12px 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border-top: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.nav-item.active {
+  color: var(--primary);
+  border-top-color: var(--primary);
+}
+
+#game-screen {
+  padding-bottom: calc(70px + var(--safe-bottom));
+}
+
+#map-panel {
+  background: var(--surface-2);
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+#map-panel h3 {
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+#map-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#map-list li {
+  padding: 8px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#map-list li.visited {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+#map-list li.current {
+  color: var(--primary);
+  font-weight: 700;
+  border-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-dark);
+}
+
+.btn-mini {
+  width: auto;
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  background: var(--primary);
+  color: #1a1208;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+
+.purchase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.purchase-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: left;
+}
+
+.purchase-item .name {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.purchase-item .desc {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 4px 0;
+}
+
+.purchase-item .price {
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.purchase-item .buy-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px;
+  background: var(--primary);
+  color: #1a1208;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#share-canvas {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+}
+
+.scene-text.typing::after {
+  content: '|';
+  animation: blink 1s step-start infinite;
+  color: var(--primary);
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.scene-image-container img {
+  animation: kenburns 20s ease-in-out infinite alternate;
+}
+
+@keyframes kenburns {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.08) translate(-1%, -1%); }
+}
+
+.scene-image-container.npc img,
+.scene-image-container.indoor img,
+.scene-image-container.combat img {
+  animation: none;
+}
