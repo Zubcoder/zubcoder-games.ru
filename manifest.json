@@ -1,0 +1,22 @@
+{
+  "name": "Тайна Золотой Орды",
+  "short_name": "Золотая Орда",
+  "description": "Браузерная AI-игра в жанре текстового приключения",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0c08",
+  "theme_color": "#1a1208",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

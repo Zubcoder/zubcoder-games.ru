@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1208">
+  <meta name="description" content="Браузерная AI-игра «Тайна Золотой Орды» от Zubcoder Games. Приключение в Казани XVI века.">
+  <title>Тайна Золотой Орды | Zubcoder Games</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="assets/icon-192.png">
+</head>
+<body>
+  <main id="app">
+    <header class="app-header">
+      <div class="brand">Zubcoder Games</div>
+      <h1>Тайна Золотой Орды</h1>
+      <button id="menu-btn" class="icon-btn" aria-label="Меню">☰</button>
+    </header>
+
+    <nav id="menu" class="hidden">
+      <button class="menu-item" data-target="start-screen">Главная</button>
+      <button class="menu-item" data-target="about-screen">Об игре</button>
+      <button id="reset-game" class="menu-item danger">Новая игра</button>
+    </nav>
+
+    <section id="start-screen" class="screen">
+      <div class="hero">
+        <div class="hero-visual">
+          <div class="crest">⚜️</div>
+        </div>
+        <h2>Казань, 1555 год</h2>
+        <p class="tagline">Ты — молодой купец Алёша Солнцев. Случайно ты узнал о легендарном сокровище Золотой Орды, спрятанном в подземельях Казанского Кремля.</p>
+        <p class="subline">Пройди четыре испытания, собери ключи и найди клад раньше соперника — бухарского купца Мусафира.</p>
+        <div class="actions">
+          <button id="start-btn" class="btn btn-primary">Начать путешествие</button>
+          <button id="continue-btn" class="btn btn-secondary" disabled>Продолжить</button>
+        </div>
+        <p class="note">Все сцены и иллюстрации генерируются искусственным интеллектом в реальном времени.</p>
+      </div>
+    </section>
+
+    <section id="game-screen" class="screen hidden">
+      <div class="scene-header">
+        <div id="location-bar">Начало пути</div>
+        <button id="inventory-toggle" class="btn btn-ghost">Инвентарь</button>
+      </div>
+
+      <div id="scene-image-container">
+        <img id="scene-image" src="" alt="Иллюстрация локации" class="hidden">
+        <div id="loader" class="loader"></div>
+      </div>
+
+      <div id="scene-text" class="scene-text"></div>
+
+      <div id="inventory-panel" class="hidden">
+        <strong>Инвентарь:</strong>
+        <ul id="inventory-list"></ul>
+      </div>
+
+      <div id="choices" class="choices"></div>
+
+      <div id="history-panel" class="hidden">
+        <h3>История</h3>
+        <ul id="history-list"></ul>
+      </div>
+    </section>
+
+    <section id="about-screen" class="screen hidden">
+      <h2>Об игре</h2>
+      <p><strong>Тайна Золотой Орды</strong> — браузерная текстовая AI-игра в жанре приключенческого квеста.</p>
+      <p>Разработчик: <strong>Zubcoder Games</strong></p>
+      <p>Тексты и изображения создаются генеративными технологиями. Каждое прохождение может отличаться.</p>
+      <ul class="links">
+        <li><a href="docs/privacy-policy.html">Политика конфиденциальности</a></li>
+        <li><a href="docs/terms-of-service.html">Пользовательское соглашение</a></li>
+      </ul>
+      <button class="back-btn btn btn-secondary">Назад</button>
+    </section>
+  </main>
+
+  <div id="error-toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
