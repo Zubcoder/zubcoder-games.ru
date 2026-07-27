@@ -1,10 +1,13 @@
-const CACHE_NAME = 'tayna-zolotoy-ordy-v1';
+const CACHE_NAME = 'tayna-zolotoy-ordy-v2';
 const ASSETS = [
   '/',
   '/index.html',
   '/styles.css',
   '/app.js',
-  '/manifest.json'
+  '/manifest.json',
+  '/assets/bg-kremlin.jpg',
+  '/assets/icon-192.png',
+  '/assets/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
