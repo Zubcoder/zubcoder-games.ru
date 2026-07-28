@@ -296,10 +296,18 @@
     }
   }
 
+  function cleanNarration(text) {
+    if (!text) return '';
+    // Strip UI stats and any trailing meta injected by the model
+    return text.replace(/\s*[💰❤️][\s\S]*/, '').trim();
+  }
+
   function speakBrowser(text) {
     if (!window.speechSynthesis) return;
+    const narration = cleanNarration(text);
+    if (!narration) return;
     window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
+    const utter = new SpeechSynthesisUtterance(narration);
     utter.lang = 'ru-RU';
     utter.rate = 0.85;
     utter.pitch = 0.9;
@@ -313,14 +321,15 @@
   }
 
   async function speakServer(text) {
-    if (!text) return;
+    const narration = cleanNarration(text);
+    if (!narration) return;
     stopTTS();
     ttsAbortController = new AbortController();
     try {
       const res = await fetch(`${API_BASE}/api/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.slice(0, 5000) }),
+        body: JSON.stringify({ text: narration.slice(0, 5000) }),
         signal: ttsAbortController.signal
       });
       if (!res.ok) throw new Error('tts failed');
@@ -330,16 +339,16 @@
     } catch (e) {
       if (e.name === 'AbortError') return;
       console.error('Server TTS error', e);
-      speakBrowser(text);
+      speakBrowser(narration);
     }
   }
 
   function speak(text) {
     if (!settings.ttsEnabled) return;
-    if (!text) return;
-    if (text.length > 5000) text = text.slice(0, 5000);
+    const narration = cleanNarration(text);
+    if (!narration) return;
     currentAudioUrl = '';
-    speakServer(text);
+    speakServer(narration);
   }
 
   function playSceneAudio(url) {
@@ -577,19 +586,29 @@
     callApi(`Ответить: ${text}`);
   }
 
-  // Typing effect
+  // Typing effect — instant for long text so the UI never hangs
   function typeText(element, text, speed) {
     if (state.typingInterval) {
       clearInterval(state.typingInterval);
       state.typingInterval = null;
     }
     stopTTS();
-    element.textContent = '';
     element.classList.remove('typing');
     void element.offsetWidth; // reflow
+
+    const maxTypedChars = 240;
+    const ms = Math.max(10, Math.min(speed || settings.typingSpeed, 22));
+
+    // Very long blocks slow down the page; show them immediately
+    if (text.length > maxTypedChars || settings.typingSpeed <= 0) {
+      element.textContent = text;
+      element.classList.add('visible');
+      return;
+    }
+
+    element.textContent = '';
     element.classList.add('typing', 'visible');
     let i = 0;
-    const ms = speed || settings.typingSpeed;
     state.typingInterval = setInterval(() => {
       if (i >= text.length) {
         clearInterval(state.typingInterval);
@@ -599,7 +618,8 @@
       }
       const ch = text.charAt(i);
       element.textContent += ch;
-      if (ch !== ' ' && ch !== '\n') playSfx('type');
+      // typewriter tick every 4th character to avoid audio glitches
+      if (ch !== ' ' && ch !== '\n' && i % 4 === 0) playSfx('type');
       i++;
     }, ms);
   }
