@@ -106,11 +106,19 @@
   let melodyTimer = null;
   let currentTTS = null;
   let currentAudioUrl = '';
+  let ttsGain = null;
+  let ttsSource = null;
+  let ttsPlaying = false;
+  let ambientStarted = false;
+  let sceneCount = 0;
 
   function initAudio() {
     if (audioCtx) return audioCtx;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      ttsGain = audioCtx.createGain();
+      ttsGain.gain.value = 1.15;
+      ttsGain.connect(audioCtx.destination);
     } catch (e) {
       console.error('Audio init failed', e);
     }
@@ -157,45 +165,45 @@
   }
 
   function playSfx(name) {
+    resumeAudio();
     if (!settings.audioEnabled || !audioCtx) return;
     const now = audioCtx.currentTime;
     switch (name) {
       case 'click':
-        playTone(880, 'sine', 0.08, 0.08, now);
+        playTone(880, 'sine', 0.08, 0.22, now);
         break;
       case 'coin':
-        playTone(1760, 'sine', 0.12, 0.1, now);
-        playTone(2637, 'sine', 0.18, 0.06, now + 0.06);
+        playTone(1760, 'sine', 0.12, 0.28, now);
+        playTone(2637, 'sine', 0.18, 0.18, now + 0.06);
         break;
       case 'duel':
-        playTone(120, 'sawtooth', 0.25, 0.05, now);
+        playTone(120, 'sawtooth', 0.25, 0.18, now);
         break;
       case 'win':
-        [330, 392, 494, 659].forEach((f, i) => playTone(f, 'triangle', 0.3, 0.07, now + i * 0.08));
+        [330, 392, 494, 659].forEach((f, i) => playTone(f, 'triangle', 0.3, 0.18, now + i * 0.08));
         break;
       case 'lose':
-        [392, 330, 247].forEach((f, i) => playTone(f, 'sawtooth', 0.3, 0.05, now + i * 0.12));
+        [392, 330, 247].forEach((f, i) => playTone(f, 'sawtooth', 0.3, 0.12, now + i * 0.12));
         break;
       case 'purchase':
-        [523, 659, 784, 1047].forEach((f, i) => playTone(f, 'sine', 0.25, 0.08, now + i * 0.08));
+        [523, 659, 784, 1047].forEach((f, i) => playTone(f, 'sine', 0.25, 0.2, now + i * 0.08));
         break;
       case 'type':
-        playTone(1200 + Math.random() * 400, 'sine', 0.03, 0.015, now);
+        playTone(1200 + Math.random() * 400, 'sine', 0.03, 0.05, now);
         break;
     }
   }
 
   function playMelodyNote() {
     if (!settings.audioEnabled || !audioCtx || audioCtx.state !== 'running') return;
-    if (Math.random() > 0.7) return; // sparse melody
+    if (Math.random() > 0.55) return;
     const note = ETHNIC_SCALE[Math.floor(Math.random() * ETHNIC_SCALE.length)];
     const t = audioCtx.currentTime;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    // plucked timbre: triangle with fast attack and exponential decay
     osc.type = 'triangle';
     osc.frequency.value = note;
-    const vol = 0.02 + Math.random() * 0.025;
+    const vol = 0.05 + Math.random() * 0.04;
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(vol, t + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8 + Math.random() * 0.8);
@@ -205,10 +213,13 @@
   }
 
   function startAmbient() {
-    if (!audioCtx) return;
+    resumeAudio();
+    if (!audioCtx || ambientStarted) return;
     stopAmbient();
+    ambientStarted = true;
+
     const master = audioCtx.createGain();
-    master.gain.value = 0.35;
+    master.gain.value = 0.55;
     master.connect(audioCtx.destination);
 
     // Low drone
@@ -216,7 +227,7 @@
     osc1.type = 'sine';
     osc1.frequency.value = 55;
     const gain1 = audioCtx.createGain();
-    gain1.gain.value = 0.55;
+    gain1.gain.value = 0.75;
     osc1.connect(gain1).connect(master);
     osc1.start();
 
@@ -224,7 +235,7 @@
     osc2.type = 'triangle';
     osc2.frequency.value = 110;
     const gain2 = audioCtx.createGain();
-    gain2.gain.value = 0.12;
+    gain2.gain.value = 0.22;
     osc2.connect(gain2).connect(master);
     osc2.start();
 
@@ -233,7 +244,7 @@
     lfo.type = 'sine';
     lfo.frequency.value = 0.08;
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.08;
+    lfoGain.gain.value = 0.1;
     lfo.connect(lfoGain).connect(gain1.gain);
     lfo.start();
 
@@ -241,15 +252,15 @@
     const noise = createBrownNoise();
     const noiseFilter = audioCtx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 450;
+    noiseFilter.frequency.value = 480;
     const noiseGain = audioCtx.createGain();
-    noiseGain.gain.value = 0.18;
+    noiseGain.gain.value = 0.32;
     noise.connect(noiseFilter).connect(noiseGain).connect(master);
     noise.start();
 
     audioNodes = [osc1, osc2, lfo, noise, master, gain1, gain2, lfoGain, noiseFilter, noiseGain];
 
-    melodyTimer = setInterval(playMelodyNote, 1400);
+    melodyTimer = setInterval(playMelodyNote, 1200);
   }
 
   function stopAmbient() {
@@ -262,6 +273,7 @@
       try { node.disconnect(); } catch (e) {}
     });
     audioNodes = [];
+    ambientStarted = false;
   }
 
   function updateAudioBtn() {
@@ -279,7 +291,7 @@
     settings.audioEnabled = !settings.audioEnabled;
     updateAudioBtn();
     if (settings.audioEnabled) {
-      if (audioNodes.length === 0) startAmbient();
+      startAmbient();
     } else {
       stopAmbient();
     }
@@ -293,18 +305,52 @@
     saveSettings();
     updateAudioBtn();
     updateTtsBtn();
-    if (audioNodes.length === 0) startAmbient();
+    startAmbient();
   }
 
-  // TTS
+  // TTS via Web Audio so it can start from a running AudioContext
+  // even after the original user gesture has finished.
   function stopTTS() {
-    if (currentTTS) {
-      currentTTS.pause();
-      currentTTS.currentTime = 0;
-      currentTTS = null;
+    if (ttsSource) {
+      try { ttsSource.stop(); } catch (e) {}
+      try { ttsSource.disconnect(); } catch (e) {}
+      ttsSource = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    ttsPlaying = false;
+    currentTTS = null;
     els.ttsBtn.classList.remove('speaking');
+  }
+
+  async function playAudioUrl(url) {
+    if (!settings.ttsEnabled || !url) return;
+    const ctx = resumeAudio();
+    if (!ctx) return;
+    stopTTS();
+    els.ttsBtn.classList.add('speaking');
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('fetch audio failed');
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ttsGain || ctx.destination);
+      source.onended = () => {
+        ttsPlaying = false;
+        ttsSource = null;
+        currentTTS = null;
+        els.ttsBtn.classList.remove('speaking');
+      };
+      ttsSource = source;
+      currentTTS = source;
+      ttsPlaying = true;
+      source.start(0);
+    } catch (e) {
+      console.error('playAudioUrl error', e);
+      ttsPlaying = false;
+      els.ttsBtn.classList.remove('speaking');
+    }
   }
 
   function speakBrowser(text) {
@@ -318,15 +364,14 @@
     const ruMale = voices.find(v => v.lang && v.lang.startsWith('ru') && /male|мужской|yandex|filipp|dmitry/i.test(v.name));
     const ru = ruMale || voices.find(v => v.lang && v.lang.startsWith('ru'));
     if (ru) utter.voice = ru;
-    utter.onstart = () => els.ttsBtn.classList.add('speaking');
-    utter.onend = () => els.ttsBtn.classList.remove('speaking');
+    utter.onstart = () => { ttsPlaying = true; els.ttsBtn.classList.add('speaking'); };
+    utter.onend = () => { ttsPlaying = false; els.ttsBtn.classList.remove('speaking'); };
     window.speechSynthesis.speak(utter);
   }
 
   async function speakServer(text) {
     if (!text) return;
     stopTTS();
-    els.ttsBtn.classList.add('speaking');
     try {
       const res = await fetch(`${API_BASE}/api/tts`, {
         method: 'POST',
@@ -335,20 +380,10 @@
       });
       if (!res.ok) throw new Error('tts failed');
       const data = await res.json();
-      const audio = new Audio(data.audio_url);
-      currentTTS = audio;
-      audio.onended = () => {
-        els.ttsBtn.classList.remove('speaking');
-        currentTTS = null;
-      };
-      audio.onerror = () => {
-        els.ttsBtn.classList.remove('speaking');
-        speakBrowser(text);
-      };
-      await audio.play();
+      currentAudioUrl = data.audio_url;
+      await playAudioUrl(currentAudioUrl);
     } catch (e) {
       console.error('Server TTS error', e);
-      els.ttsBtn.classList.remove('speaking');
       speakBrowser(text);
     }
   }
@@ -356,36 +391,22 @@
   function speak(text) {
     if (!settings.ttsEnabled) return;
     if (text.length > 5000) text = text.slice(0, 5000);
-    speakServer(text);
+    if (currentAudioUrl) {
+      playAudioUrl(currentAudioUrl);
+    } else {
+      speakServer(text);
+    }
   }
 
   function playSceneAudio(url) {
     if (!settings.ttsEnabled || !url) return;
-    stopTTS();
     currentAudioUrl = url;
-    const audio = new Audio(url);
-    currentTTS = audio;
-    els.ttsBtn.classList.add('speaking');
-    audio.onended = () => {
-      els.ttsBtn.classList.remove('speaking');
-      currentTTS = null;
-    };
-    audio.onerror = () => {
-      els.ttsBtn.classList.remove('speaking');
-      currentTTS = null;
-    };
-    audio.play().catch(err => {
-      if (err.name === 'NotAllowedError') {
-        // User interaction required; ignore silently here
-      }
-      els.ttsBtn.classList.remove('speaking');
-    });
+    playAudioUrl(url);
   }
 
   function toggleTTS() {
     resumeAudio();
-    // If currently speaking, stop; otherwise (re)play narration
-    if (currentTTS && !currentTTS.paused) {
+    if (ttsPlaying) {
       stopTTS();
       return;
     }
@@ -395,10 +416,10 @@
       saveSettings();
     }
     if (currentAudioUrl) {
-      playSceneAudio(currentAudioUrl);
+      playAudioUrl(currentAudioUrl);
     } else {
       const text = els.sceneText.textContent;
-      if (text) speak(text);
+      if (text) speakServer(text);
     }
   }
 
@@ -572,6 +593,7 @@
     choices.forEach((choice, index) => {
       const btn = document.createElement('button');
       btn.className = 'choice-btn';
+      btn.style.animationDelay = `${index * 0.08}s`;
       const num = index + 1;
       const text = String(choice).replace(/^\d+\.\s*/, '');
       btn.innerHTML = `<span class="num">${num}.</span> ${escapeHtml(text)}`;
@@ -718,6 +740,10 @@
         els.sceneImage.classList.remove('hidden');
         void els.sceneImage.offsetWidth;
         els.sceneImage.classList.add('visible');
+        // Restart Ken Burns pan for every new scene
+        els.sceneImage.style.animation = 'none';
+        void els.sceneImage.offsetWidth;
+        els.sceneImage.style.animation = '';
         setLoading(false);
       };
       els.sceneImage.onerror = () => {
@@ -729,8 +755,10 @@
       setLoading(false);
     }
 
+    sceneCount++;
     if (data.image_type) {
-      els.sceneImageContainer.className = `scene-image-container ${data.image_type}`;
+      const oddClass = sceneCount % 2 === 1 ? 'odd' : '';
+      els.sceneImageContainer.className = `scene-image-container ${data.image_type} ${oddClass}`.trim();
     }
 
     if (data.duel_choices && data.duel_choices.length > 0) {
@@ -805,19 +833,20 @@
     }
 
     function createParticle() {
+      const colors = ['#c9a227', '#f3e9d2', '#e8dcc0', '#b08d2b', '#8fa8a8'];
       return {
         x: Math.random() * width,
-        y: height + Math.random() * 50,
-        size: 0.5 + Math.random() * 2.5,
-        speedY: 0.2 + Math.random() * 0.6,
-        speedX: (Math.random() - 0.5) * 0.4,
-        opacity: 0.1 + Math.random() * 0.4,
-        color: Math.random() > 0.7 ? '#c9a227' : '#f3e9d2',
+        y: height + Math.random() * 60,
+        size: 0.8 + Math.random() * 3.2,
+        speedY: 0.4 + Math.random() * 1.0,
+        speedX: (Math.random() - 0.5) * 0.7,
+        opacity: 0.2 + Math.random() * 0.6,
+        color: colors[Math.floor(Math.random() * colors.length)],
         life: 0
       };
     }
 
-    for (let i = 0; i < 40; i++) particles.push(createParticle());
+    for (let i = 0; i < 70; i++) particles.push(createParticle());
 
     function animate() {
       ctx.clearRect(0, 0, width, height);

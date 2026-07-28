@@ -388,6 +388,11 @@ html, body {
   margin-bottom: 16px;
 }
 
+@keyframes choiceAppear {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .choice-btn {
   background: var(--surface-2);
   color: var(--text);
@@ -399,6 +404,8 @@ html, body {
   font-family: inherit;
   font-size: 1rem;
   cursor: pointer;
+  opacity: 0;
+  animation: choiceAppear 0.35s ease-out forwards;
 }
 
 .choice-btn .num {
@@ -732,12 +739,22 @@ html, body {
 }
 
 .scene-image-container img {
-  animation: kenburns 20s ease-in-out infinite alternate;
+  animation: kenburns 18s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 @keyframes kenburns {
-  0% { transform: scale(1) translate(0, 0); }
-  100% { transform: scale(1.08) translate(-1%, -1%); }
+  0% { transform: scale(1) translate(0, 1%); }
+  100% { transform: scale(1.14) translate(-2%, -2%); }
+}
+
+@keyframes kenburnsReverse {
+  0% { transform: scale(1.12) translate(1%, -2%); }
+  100% { transform: scale(1) translate(-1%, 1%); }
+}
+
+.scene-image-container.odd img {
+  animation-name: kenburnsReverse;
 }
 
 .scene-image-container.npc img,
