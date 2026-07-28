@@ -123,6 +123,15 @@
       ttsGain = audioCtx.createGain();
       ttsGain.gain.value = 1.25;
       ttsGain.connect(audioCtx.destination);
+
+      // Keep the AudioContext alive between scenes so TTS can start
+      // without requiring a fresh user gesture every time.
+      const keepOsc = audioCtx.createOscillator();
+      const keepGain = audioCtx.createGain();
+      keepGain.gain.value = 0.0001;
+      keepOsc.connect(keepGain);
+      keepGain.connect(audioCtx.destination);
+      keepOsc.start();
     } catch (e) {
       console.error('Audio init failed', e);
     }
@@ -589,6 +598,7 @@
 
   async function callApi(action, retryCount = 1) {
     setLoading(true);
+    if (els.loader) els.loader.textContent = 'Придумываем историю…';
     try {
       const response = await fetch(`${API_BASE}/api/scene`, {
         method: 'POST',
@@ -619,6 +629,7 @@
         throw new Error(`Ошибка сервера: ${response.status}. ${errText.slice(0, 120)}`);
       }
       const data = await response.json();
+      if (els.loader) els.loader.textContent = 'Рисуем иллюстрацию…';
       applyScene(data, action);
     } catch (err) {
       console.error(err);
@@ -717,12 +728,19 @@
   }
 
   function startNewGame() {
+    const startBtn = document.querySelector('#start-screen .btn-primary');
+    if (startBtn) {
+      startBtn.textContent = 'Загрузка…';
+      startBtn.disabled = true;
+    }
     resetGame();
     enableAudioByDefault();
     callApi('начать игру');
   }
 
   function makeChoice(action) {
+    playSfx('click');
+    resumeAudio();
     callApi(action);
   }
 
