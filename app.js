@@ -102,22 +102,26 @@
 
   // Audio engine
   let audioCtx = null;
-  let audioNodes = [];
-  let melodyTimer = null;
+  let ambientAudio = null;
   let currentTTS = null;
   let currentAudioUrl = '';
   let ttsGain = null;
   let ttsSource = null;
   let ttsPlaying = false;
-  let ambientStarted = false;
   let sceneCount = 0;
+
+  window.ttsDebug = {
+    get currentAudioUrl() { return currentAudioUrl; },
+    get ttsPlaying() { return ttsPlaying; },
+    get audioCtxState() { return audioCtx ? audioCtx.state : 'none'; }
+  };
 
   function initAudio() {
     if (audioCtx) return audioCtx;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       ttsGain = audioCtx.createGain();
-      ttsGain.gain.value = 1.15;
+      ttsGain.gain.value = 1.25;
       ttsGain.connect(audioCtx.destination);
     } catch (e) {
       console.error('Audio init failed', e);
@@ -125,28 +129,12 @@
     return audioCtx;
   }
 
-  function resumeAudio() {
+  async function resumeAudio() {
     const ctx = initAudio();
     if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
+      try { await ctx.resume(); } catch (e) {}
     }
     return ctx;
-  }
-
-  function createBrownNoise() {
-    const bufferSize = 2 * audioCtx.sampleRate;
-    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-    const data = buffer.getChannelData(0);
-    let lastOut = 0;
-    for (let i = 0; i < bufferSize; i++) {
-      const white = Math.random() * 2 - 1;
-      lastOut = (lastOut + (0.02 * white)) / 1.02;
-      data[i] = lastOut * 3.5;
-    }
-    const noise = audioCtx.createBufferSource();
-    noise.buffer = buffer;
-    noise.loop = true;
-    return noise;
   }
 
   function playTone(freq, type, duration, volume, when) {
@@ -164,8 +152,8 @@
     osc.stop(t + duration + 0.05);
   }
 
-  function playSfx(name) {
-    resumeAudio();
+  async function playSfx(name) {
+    await resumeAudio();
     if (!settings.audioEnabled || !audioCtx) return;
     const now = audioCtx.currentTime;
     switch (name) {
@@ -194,86 +182,23 @@
     }
   }
 
-  function playMelodyNote() {
-    if (!settings.audioEnabled || !audioCtx || audioCtx.state !== 'running') return;
-    if (Math.random() > 0.55) return;
-    const note = ETHNIC_SCALE[Math.floor(Math.random() * ETHNIC_SCALE.length)];
-    const t = audioCtx.currentTime;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = note;
-    const vol = 0.05 + Math.random() * 0.04;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(vol, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8 + Math.random() * 0.8);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 2);
-  }
-
   function startAmbient() {
-    resumeAudio();
-    if (!audioCtx || ambientStarted) return;
-    stopAmbient();
-    ambientStarted = true;
-
-    const master = audioCtx.createGain();
-    master.gain.value = 0.55;
-    master.connect(audioCtx.destination);
-
-    // Low drone
-    const osc1 = audioCtx.createOscillator();
-    osc1.type = 'sine';
-    osc1.frequency.value = 55;
-    const gain1 = audioCtx.createGain();
-    gain1.gain.value = 0.75;
-    osc1.connect(gain1).connect(master);
-    osc1.start();
-
-    const osc2 = audioCtx.createOscillator();
-    osc2.type = 'triangle';
-    osc2.frequency.value = 110;
-    const gain2 = audioCtx.createGain();
-    gain2.gain.value = 0.22;
-    osc2.connect(gain2).connect(master);
-    osc2.start();
-
-    // Slow LFO on drone
-    const lfo = audioCtx.createOscillator();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.08;
-    const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.1;
-    lfo.connect(lfoGain).connect(gain1.gain);
-    lfo.start();
-
-    // Wind/river noise
-    const noise = createBrownNoise();
-    const noiseFilter = audioCtx.createBiquadFilter();
-    noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 480;
-    const noiseGain = audioCtx.createGain();
-    noiseGain.gain.value = 0.32;
-    noise.connect(noiseFilter).connect(noiseGain).connect(master);
-    noise.start();
-
-    audioNodes = [osc1, osc2, lfo, noise, master, gain1, gain2, lfoGain, noiseFilter, noiseGain];
-
-    melodyTimer = setInterval(playMelodyNote, 1200);
+    if (!settings.audioEnabled) return;
+    if (!ambientAudio) {
+      ambientAudio = new Audio('assets/ambient.mp3');
+      ambientAudio.loop = true;
+      ambientAudio.volume = 0.35;
+      ambientAudio.preload = 'auto';
+    }
+    ambientAudio.currentTime = 0;
+    const p = ambientAudio.play();
+    if (p && p.catch) p.catch(() => {});
   }
 
   function stopAmbient() {
-    if (melodyTimer) {
-      clearInterval(melodyTimer);
-      melodyTimer = null;
+    if (ambientAudio) {
+      try { ambientAudio.pause(); ambientAudio.currentTime = 0; } catch (e) {}
     }
-    audioNodes.forEach(node => {
-      try { node.stop(); } catch (e) {}
-      try { node.disconnect(); } catch (e) {}
-    });
-    audioNodes = [];
-    ambientStarted = false;
   }
 
   function updateAudioBtn() {
@@ -298,8 +223,8 @@
     saveSettings();
   }
 
-  function enableAudioByDefault() {
-    resumeAudio();
+  async function enableAudioByDefault() {
+    await resumeAudio();
     settings.audioEnabled = true;
     settings.ttsEnabled = true;
     saveSettings();
@@ -324,11 +249,14 @@
 
   async function playAudioUrl(url) {
     if (!settings.ttsEnabled || !url) return;
-    const ctx = resumeAudio();
-    if (!ctx) return;
     stopTTS();
+    const ctx = await resumeAudio();
+    if (!ctx) return;
+    console.log('[TTS] play', url, 'ctx state', ctx.state);
+    currentAudioUrl = url;
     els.ttsBtn.classList.add('speaking');
     try {
+      if (ctx.state === 'suspended') await ctx.resume();
       const res = await fetch(url, { mode: 'cors' });
       if (!res.ok) throw new Error('fetch audio failed');
       const arrayBuffer = await res.arrayBuffer();
@@ -347,7 +275,7 @@
       ttsPlaying = true;
       source.start(0);
     } catch (e) {
-      console.error('playAudioUrl error', e);
+      console.error('playAudioUrl error', url, e);
       ttsPlaying = false;
       els.ttsBtn.classList.remove('speaking');
     }
@@ -390,12 +318,10 @@
 
   function speak(text) {
     if (!settings.ttsEnabled) return;
+    if (!text) return;
     if (text.length > 5000) text = text.slice(0, 5000);
-    if (currentAudioUrl) {
-      playAudioUrl(currentAudioUrl);
-    } else {
-      speakServer(text);
-    }
+    currentAudioUrl = '';
+    speakServer(text);
   }
 
   function playSceneAudio(url) {
@@ -404,8 +330,8 @@
     playAudioUrl(url);
   }
 
-  function toggleTTS() {
-    resumeAudio();
+  async function toggleTTS() {
+    await resumeAudio();
     if (ttsPlaying) {
       stopTTS();
       return;

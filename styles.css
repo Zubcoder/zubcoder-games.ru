@@ -37,8 +37,8 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
-  box-shadow: 0 0 40px var(--shadow);
+  background: linear-gradient(180deg, rgba(26, 18, 8, 0.82) 0%, rgba(15, 12, 8, 0.92) 100%);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.7);
 }
 
 .app-header {
@@ -491,12 +491,12 @@ html, body {
 
 .parallax-bg {
   position: fixed;
-  inset: 0;
+  inset: -20px;
   z-index: -1;
   background: url('assets/bg-kremlin.jpg') center/cover no-repeat;
-  transform: scale(1.1);
+  transform: scale(1.08);
   transition: transform 0.2s ease-out;
-  filter: brightness(0.45) sepia(0.3);
+  filter: brightness(0.38) sepia(0.22) blur(1px) saturate(0.85);
 }
 
 .particles-canvas {
