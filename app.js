@@ -105,6 +105,7 @@
   let audioNodes = [];
   let melodyTimer = null;
   let currentTTS = null;
+  let currentAudioUrl = '';
 
   function initAudio() {
     if (audioCtx) return audioCtx;
@@ -358,14 +359,41 @@
     speakServer(text);
   }
 
+  function playSceneAudio(url) {
+    if (!settings.ttsEnabled || !url) return;
+    stopTTS();
+    currentAudioUrl = url;
+    const audio = new Audio(url);
+    currentTTS = audio;
+    els.ttsBtn.classList.add('speaking');
+    audio.onended = () => {
+      els.ttsBtn.classList.remove('speaking');
+      currentTTS = null;
+    };
+    audio.onerror = () => {
+      els.ttsBtn.classList.remove('speaking');
+      currentTTS = null;
+    };
+    audio.play().catch(err => {
+      if (err.name === 'NotAllowedError') {
+        // User interaction required; ignore silently here
+      }
+      els.ttsBtn.classList.remove('speaking');
+    });
+  }
+
   function toggleTTS() {
     resumeAudio();
     settings.ttsEnabled = !settings.ttsEnabled;
     updateTtsBtn();
     saveSettings();
     if (settings.ttsEnabled) {
-      const text = els.sceneText.textContent;
-      if (text) speak(text);
+      if (currentAudioUrl) {
+        playSceneAudio(currentAudioUrl);
+      } else {
+        const text = els.sceneText.textContent;
+        if (text) speak(text);
+      }
     } else {
       stopTTS();
     }
@@ -598,7 +626,6 @@
         clearInterval(state.typingInterval);
         state.typingInterval = null;
         element.classList.remove('typing');
-        if (settings.ttsEnabled && settings.autoplay) speak(text);
         return;
       }
       const ch = text.charAt(i);
@@ -715,9 +742,13 @@
     renderHistory();
     showScreen('game');
 
-    // also preload server TTS if autoplay enabled
-    if (settings.ttsEnabled && settings.autoplay && data.scene_text) {
-      // typeText will trigger speak when finished; pre-generation already handled on-demand
+    // Autoplay server-generated narration immediately while text types
+    if (settings.autoplay && settings.ttsEnabled) {
+      if (data.audio_url) {
+        playSceneAudio(data.audio_url);
+      } else if (data.scene_text) {
+        speak(data.scene_text);
+      }
     }
   }
 
