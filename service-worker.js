@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tayna-zolotoy-ordy-v6';
+const CACHE_NAME = 'tayna-zolotoy-ordy-v7';
 const ASSETS = [
   '/',
   '/index.html',
