@@ -20,6 +20,8 @@
     { id: 'baumana', name: 'Улица Баумана' }
   ];
 
+  const ETHNIC_SCALE = [165, 196, 220, 262, 294, 330, 392, 440]; // D minor pentatonic-ish
+
   const state = {
     session_id: '',
     inventory: [],
@@ -42,9 +44,9 @@
   };
 
   const settings = {
-    audioEnabled: false,
-    ttsEnabled: false,
-    autoplay: false,
+    audioEnabled: true,
+    ttsEnabled: true,
+    autoplay: true,
     typingSpeed: 22
   };
 
@@ -94,20 +96,32 @@
     mapList: document.getElementById('map-list'),
     shareCanvas: document.getElementById('share-canvas'),
     bottomNav: document.querySelector('.bottom-nav'),
-    parallaxBg: document.querySelector('.parallax-bg')
+    parallaxBg: document.querySelector('.parallax-bg'),
+    particlesCanvas: document.getElementById('particles-canvas')
   };
 
   // Audio engine
   let audioCtx = null;
   let audioNodes = [];
+  let melodyTimer = null;
+  let currentTTS = null;
 
   function initAudio() {
-    if (audioCtx) return;
+    if (audioCtx) return audioCtx;
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     } catch (e) {
       console.error('Audio init failed', e);
     }
+    return audioCtx;
+  }
+
+  function resumeAudio() {
+    const ctx = initAudio();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    return ctx;
   }
 
   function createBrownNoise() {
@@ -126,11 +140,74 @@
     return noise;
   }
 
+  function playTone(freq, type, duration, volume, when) {
+    if (!settings.audioEnabled || !audioCtx) return;
+    const t = when || audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(volume, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.05);
+  }
+
+  function playSfx(name) {
+    if (!settings.audioEnabled || !audioCtx) return;
+    const now = audioCtx.currentTime;
+    switch (name) {
+      case 'click':
+        playTone(880, 'sine', 0.08, 0.08, now);
+        break;
+      case 'coin':
+        playTone(1760, 'sine', 0.12, 0.1, now);
+        playTone(2637, 'sine', 0.18, 0.06, now + 0.06);
+        break;
+      case 'duel':
+        playTone(120, 'sawtooth', 0.25, 0.05, now);
+        break;
+      case 'win':
+        [330, 392, 494, 659].forEach((f, i) => playTone(f, 'triangle', 0.3, 0.07, now + i * 0.08));
+        break;
+      case 'lose':
+        [392, 330, 247].forEach((f, i) => playTone(f, 'sawtooth', 0.3, 0.05, now + i * 0.12));
+        break;
+      case 'purchase':
+        [523, 659, 784, 1047].forEach((f, i) => playTone(f, 'sine', 0.25, 0.08, now + i * 0.08));
+        break;
+      case 'type':
+        playTone(1200 + Math.random() * 400, 'sine', 0.03, 0.015, now);
+        break;
+    }
+  }
+
+  function playMelodyNote() {
+    if (!settings.audioEnabled || !audioCtx || audioCtx.state !== 'running') return;
+    if (Math.random() > 0.7) return; // sparse melody
+    const note = ETHNIC_SCALE[Math.floor(Math.random() * ETHNIC_SCALE.length)];
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    // plucked timbre: triangle with fast attack and exponential decay
+    osc.type = 'triangle';
+    osc.frequency.value = note;
+    const vol = 0.02 + Math.random() * 0.025;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(vol, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8 + Math.random() * 0.8);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 2);
+  }
+
   function startAmbient() {
     if (!audioCtx) return;
     stopAmbient();
     const master = audioCtx.createGain();
-    master.gain.value = 0.12;
+    master.gain.value = 0.35;
     master.connect(audioCtx.destination);
 
     // Low drone
@@ -138,7 +215,7 @@
     osc1.type = 'sine';
     osc1.frequency.value = 55;
     const gain1 = audioCtx.createGain();
-    gain1.gain.value = 0.4;
+    gain1.gain.value = 0.55;
     osc1.connect(gain1).connect(master);
     osc1.start();
 
@@ -146,7 +223,7 @@
     osc2.type = 'triangle';
     osc2.frequency.value = 110;
     const gain2 = audioCtx.createGain();
-    gain2.gain.value = 0.08;
+    gain2.gain.value = 0.12;
     osc2.connect(gain2).connect(master);
     osc2.start();
 
@@ -155,7 +232,7 @@
     lfo.type = 'sine';
     lfo.frequency.value = 0.08;
     const lfoGain = audioCtx.createGain();
-    lfoGain.gain.value = 0.05;
+    lfoGain.gain.value = 0.08;
     lfo.connect(lfoGain).connect(gain1.gain);
     lfo.start();
 
@@ -163,16 +240,22 @@
     const noise = createBrownNoise();
     const noiseFilter = audioCtx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
-    noiseFilter.frequency.value = 400;
+    noiseFilter.frequency.value = 450;
     const noiseGain = audioCtx.createGain();
-    noiseGain.gain.value = 0.12;
+    noiseGain.gain.value = 0.18;
     noise.connect(noiseFilter).connect(noiseGain).connect(master);
     noise.start();
 
     audioNodes = [osc1, osc2, lfo, noise, master, gain1, gain2, lfoGain, noiseFilter, noiseGain];
+
+    melodyTimer = setInterval(playMelodyNote, 1400);
   }
 
   function stopAmbient() {
+    if (melodyTimer) {
+      clearInterval(melodyTimer);
+      melodyTimer = null;
+    }
     audioNodes.forEach(node => {
       try { node.stop(); } catch (e) {}
       try { node.disconnect(); } catch (e) {}
@@ -180,12 +263,20 @@
     audioNodes = [];
   }
 
-  function toggleAudio() {
-    initAudio();
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-    settings.audioEnabled = !settings.audioEnabled;
+  function updateAudioBtn() {
     els.audioBtn.textContent = settings.audioEnabled ? '🔊' : '🔇';
     els.audioBtn.classList.toggle('active', settings.audioEnabled);
+  }
+
+  function updateTtsBtn() {
+    els.ttsBtn.textContent = settings.ttsEnabled ? '🔊' : '🔇';
+    els.ttsBtn.classList.toggle('active', settings.ttsEnabled);
+  }
+
+  function toggleAudio() {
+    resumeAudio();
+    settings.audioEnabled = !settings.audioEnabled;
+    updateAudioBtn();
     if (settings.audioEnabled) {
       if (audioNodes.length === 0) startAmbient();
     } else {
@@ -194,32 +285,89 @@
     saveSettings();
   }
 
+  function enableAudioByDefault() {
+    resumeAudio();
+    settings.audioEnabled = true;
+    settings.ttsEnabled = true;
+    saveSettings();
+    updateAudioBtn();
+    updateTtsBtn();
+    if (audioNodes.length === 0) startAmbient();
+  }
+
   // TTS
-  function speak(text) {
+  function stopTTS() {
+    if (currentTTS) {
+      currentTTS.pause();
+      currentTTS.currentTime = 0;
+      currentTTS = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    els.ttsBtn.classList.remove('speaking');
+  }
+
+  function speakBrowser(text) {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'ru-RU';
-    utter.rate = 1;
-    utter.pitch = 1;
+    utter.rate = 0.85;
+    utter.pitch = 0.9;
     const voices = window.speechSynthesis.getVoices();
-    const ru = voices.find(v => v.lang && v.lang.startsWith('ru'));
+    const ruMale = voices.find(v => v.lang && v.lang.startsWith('ru') && /male|мужской|yandex|filipp|dmitry/i.test(v.name));
+    const ru = ruMale || voices.find(v => v.lang && v.lang.startsWith('ru'));
     if (ru) utter.voice = ru;
     utter.onstart = () => els.ttsBtn.classList.add('speaking');
     utter.onend = () => els.ttsBtn.classList.remove('speaking');
     window.speechSynthesis.speak(utter);
   }
 
+  async function speakServer(text) {
+    if (!text) return;
+    stopTTS();
+    els.ttsBtn.classList.add('speaking');
+    try {
+      const res = await fetch(`${API_BASE}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 5000) })
+      });
+      if (!res.ok) throw new Error('tts failed');
+      const data = await res.json();
+      const audio = new Audio(data.audio_url);
+      currentTTS = audio;
+      audio.onended = () => {
+        els.ttsBtn.classList.remove('speaking');
+        currentTTS = null;
+      };
+      audio.onerror = () => {
+        els.ttsBtn.classList.remove('speaking');
+        speakBrowser(text);
+      };
+      await audio.play();
+    } catch (e) {
+      console.error('Server TTS error', e);
+      els.ttsBtn.classList.remove('speaking');
+      speakBrowser(text);
+    }
+  }
+
+  function speak(text) {
+    if (!settings.ttsEnabled) return;
+    if (text.length > 5000) text = text.slice(0, 5000);
+    speakServer(text);
+  }
+
   function toggleTTS() {
+    resumeAudio();
     settings.ttsEnabled = !settings.ttsEnabled;
-    els.ttsBtn.textContent = settings.ttsEnabled ? '🔊' : '🔇';
-    els.ttsBtn.classList.toggle('active', settings.ttsEnabled);
+    updateTtsBtn();
     saveSettings();
     if (settings.ttsEnabled) {
       const text = els.sceneText.textContent;
       if (text) speak(text);
     } else {
-      window.speechSynthesis.cancel();
+      stopTTS();
     }
   }
 
@@ -232,12 +380,13 @@
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
       try {
-        Object.assign(settings, JSON.parse(raw));
+        const parsed = JSON.parse(raw);
+        // preserve new defaults if keys missing
+        Object.assign(settings, parsed);
       } catch (e) {}
     }
-    els.audioBtn.textContent = settings.audioEnabled ? '🔊' : '🔇';
-    els.audioBtn.classList.toggle('active', settings.audioEnabled);
-    els.ttsBtn.textContent = settings.ttsEnabled ? '🔊' : '🔇';
+    updateAudioBtn();
+    updateTtsBtn();
   }
 
   function saveState() {
@@ -318,6 +467,7 @@
     if (isLoading) {
       els.loader.classList.remove('hidden');
       els.sceneImage.classList.add('hidden');
+      els.sceneImage.classList.remove('visible');
     } else {
       els.loader.classList.add('hidden');
     }
@@ -395,6 +545,7 @@
       const text = String(choice).replace(/^\d+\.\s*/, '');
       btn.innerHTML = `<span class="num">${num}.</span> ${escapeHtml(text)}`;
       btn.onclick = () => {
+        playSfx('click');
         if (isDuel) {
           handleDuelChoice(index, text);
         } else {
@@ -417,8 +568,10 @@
     state.flags.duel_won = won;
     state.flags.duel_answer = text;
     if (won) {
+      playSfx('win');
       showToast('Отличный ответ!');
     } else {
+      playSfx('lose');
       showToast('Промах!');
     }
     state.lastDuelCorrectIndex = undefined;
@@ -433,20 +586,26 @@
       clearInterval(state.typingInterval);
       state.typingInterval = null;
     }
+    stopTTS();
     element.textContent = '';
-    element.classList.add('typing');
+    element.classList.remove('typing');
+    void element.offsetWidth; // reflow
+    element.classList.add('typing', 'visible');
     let i = 0;
+    const ms = speed || settings.typingSpeed;
     state.typingInterval = setInterval(() => {
       if (i >= text.length) {
         clearInterval(state.typingInterval);
         state.typingInterval = null;
         element.classList.remove('typing');
-        if (settings.ttsEnabled) speak(text);
+        if (settings.ttsEnabled && settings.autoplay) speak(text);
         return;
       }
-      element.textContent += text.charAt(i);
+      const ch = text.charAt(i);
+      element.textContent += ch;
+      if (ch !== ' ' && ch !== '\n') playSfx('type');
       i++;
-    }, speed || settings.typingSpeed);
+    }, ms);
   }
 
   async function callApi(action) {
@@ -507,20 +666,27 @@
 
     els.locationBar.textContent = state.flags.location;
 
+    els.sceneText.classList.remove('visible');
     if (data.scene_text) {
       typeText(els.sceneText, data.scene_text, settings.typingSpeed);
     } else {
       els.sceneText.textContent = '';
+      els.sceneText.classList.add('visible');
     }
 
     if (data.image_url) {
+      els.sceneImage.classList.add('hidden');
+      els.sceneImage.classList.remove('visible');
       els.sceneImage.src = data.image_url;
       els.sceneImage.onload = () => {
         els.sceneImage.classList.remove('hidden');
+        void els.sceneImage.offsetWidth;
+        els.sceneImage.classList.add('visible');
         setLoading(false);
       };
       els.sceneImage.onerror = () => {
         els.sceneImage.classList.add('hidden');
+        els.sceneImage.classList.remove('visible');
         setLoading(false);
       };
     } else {
@@ -548,10 +714,16 @@
     saveState();
     renderHistory();
     showScreen('game');
+
+    // also preload server TTS if autoplay enabled
+    if (settings.ttsEnabled && settings.autoplay && data.scene_text) {
+      // typeText will trigger speak when finished; pre-generation already handled on-demand
+    }
   }
 
   function startNewGame() {
     resetGame();
+    enableAudioByDefault();
     callApi('начать игру');
   }
 
@@ -562,6 +734,7 @@
   function handleCommand() {
     const text = els.commandInput.value.trim();
     if (!text) return;
+    playSfx('click');
     if (/^\d+$/.test(text)) {
       const num = parseInt(text, 10);
       const buttons = els.choices.querySelectorAll('.choice-btn');
@@ -575,6 +748,60 @@
     els.commandInput.value = '';
   }
 
+  // Particles overlay
+  function initParticles() {
+    const canvas = els.particlesCanvas;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    function createParticle() {
+      return {
+        x: Math.random() * width,
+        y: height + Math.random() * 50,
+        size: 0.5 + Math.random() * 2.5,
+        speedY: 0.2 + Math.random() * 0.6,
+        speedX: (Math.random() - 0.5) * 0.4,
+        opacity: 0.1 + Math.random() * 0.4,
+        color: Math.random() > 0.7 ? '#c9a227' : '#f3e9d2',
+        life: 0
+      };
+    }
+
+    for (let i = 0; i < 40; i++) particles.push(createParticle());
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+      particles.forEach((p, i) => {
+        p.y -= p.speedY;
+        p.x += p.speedX + Math.sin(p.life * 0.02) * 0.2;
+        p.life++;
+        ctx.globalAlpha = p.opacity * (1 - p.life / 1200);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        if (p.y < -10 || p.life > 1200) {
+          particles[i] = createParticle();
+        }
+      });
+      requestAnimationFrame(animate);
+    }
+
+    resize();
+    window.addEventListener('resize', resize);
+    animate();
+  }
+
   // Share
   async function shareScene() {
     try {
@@ -584,97 +811,98 @@
         showToast('Поделиться можно после генерации сцены.');
         return;
       }
-    const canvas = els.shareCanvas;
-    const ctx = canvas.getContext('2d');
-    canvas.width = 1080;
-    canvas.height = 1920;
+      playSfx('click');
+      const canvas = els.shareCanvas;
+      const ctx = canvas.getContext('2d');
+      canvas.width = 1080;
+      canvas.height = 1920;
 
-    ctx.fillStyle = '#0f0c08';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0f0c08';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const drawImage = () => new Promise(resolve => {
-      if (!imageUrl) { resolve(); return; }
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, 1080, 720);
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = imageUrl;
-    });
+      const drawImage = () => new Promise(resolve => {
+        if (!imageUrl) { resolve(); return; }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, 1080, 720);
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = imageUrl;
+      });
 
-    const drawQr = () => new Promise(resolve => {
-      const qrImg = new Image();
-      qrImg.crossOrigin = 'anonymous';
-      qrImg.onload = () => {
-        ctx.drawImage(qrImg, 860, 1620, 180, 180);
-        resolve();
-      };
-      qrImg.onerror = () => resolve();
-      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://zubcoder-games.ru')}`;
-    });
+      const drawQr = () => new Promise(resolve => {
+        const qrImg = new Image();
+        qrImg.crossOrigin = 'anonymous';
+        qrImg.onload = () => {
+          ctx.drawImage(qrImg, 860, 1620, 180, 180);
+          resolve();
+        };
+        qrImg.onerror = () => resolve();
+        qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent('https://zubcoder-games.ru')}`;
+      });
 
-    await drawImage();
+      await drawImage();
 
-    // Overlay
-    const grad = ctx.createLinearGradient(0, 0, 0, 1920);
-    grad.addColorStop(0, 'rgba(15,12,8,0.2)');
-    grad.addColorStop(0.5, 'rgba(15,12,8,0.75)');
-    grad.addColorStop(1, 'rgba(15,12,8,0.95)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 1080, 1920);
+      // Overlay
+      const grad = ctx.createLinearGradient(0, 0, 0, 1920);
+      grad.addColorStop(0, 'rgba(15,12,8,0.2)');
+      grad.addColorStop(0.5, 'rgba(15,12,8,0.75)');
+      grad.addColorStop(1, 'rgba(15,12,8,0.95)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1080, 1920);
 
-    ctx.fillStyle = '#c9a227';
-    ctx.font = 'bold 52px Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Тайна Золотой Орды', 540, 840);
+      ctx.fillStyle = '#c9a227';
+      ctx.font = 'bold 52px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Тайна Золотой Орды', 540, 840);
 
-    ctx.fillStyle = '#f3e9d2';
-    ctx.font = '36px Georgia, serif';
-    ctx.textAlign = 'left';
-    const words = text.split(' ');
-    let line = '';
-    let y = 940;
-    words.forEach(word => {
-      const testLine = line + word + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > 920 && line) {
-        ctx.fillText(line, 80, y);
-        line = word + ' ';
-        y += 52;
-      } else {
-        line = testLine;
-      }
-    });
-    ctx.fillText(line, 80, y);
+      ctx.fillStyle = '#f3e9d2';
+      ctx.font = '36px Georgia, serif';
+      ctx.textAlign = 'left';
+      const words = text.split(' ');
+      let line = '';
+      let y = 940;
+      words.forEach(word => {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > 920 && line) {
+          ctx.fillText(line, 80, y);
+          line = word + ' ';
+          y += 52;
+        } else {
+          line = testLine;
+        }
+      });
+      ctx.fillText(line, 80, y);
 
-    ctx.fillStyle = '#a89b85';
-    ctx.font = '28px Georgia, serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('zubcoder-games.ru', 80, 1780);
+      ctx.fillStyle = '#a89b85';
+      ctx.font = '28px Georgia, serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('zubcoder-games.ru', 80, 1780);
 
-    await drawQr();
+      await drawQr();
 
-    canvas.toBlob(async blob => {
-      const file = new File([blob], 'tayna-zolotoy-ordy.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            title: 'Тайна Золотой Орды',
-            text: text.slice(0, 120) + '...',
-            files: [file]
-          });
-          return;
-        } catch (e) {}
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'tayna-zolotoy-ordy.png';
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast('Карточка сохранена.');
+      canvas.toBlob(async blob => {
+        const file = new File([blob], 'tayna-zolotoy-ordy.png', { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: 'Тайна Золотой Орды',
+              text: text.slice(0, 120) + '...',
+              files: [file]
+            });
+            return;
+          } catch (e) {}
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'tayna-zolotoy-ordy.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Карточка сохранена.');
       });
     } catch (err) {
       console.error('share error', err);
@@ -729,6 +957,7 @@
       showToast('Начните игру, чтобы активировать покупку.');
       return;
     }
+    playSfx('click');
     try {
       const res = await fetch(`${API_BASE}/api/purchase`, {
         method: 'POST',
@@ -751,6 +980,7 @@
         }
         saveState();
         renderStats();
+        playSfx('purchase');
         showToast(data.message);
         closePurchaseModal();
       } else {
@@ -767,7 +997,7 @@
     if (!els.parallaxBg) return;
     const x = e ? (e.clientX / window.innerWidth - 0.5) * 2 : 0;
     const y = e ? (e.clientY / window.innerHeight - 0.5) * 2 : 0;
-    els.parallaxBg.style.transform = `scale(1.1) translate(${-x * 10}px, ${-y * 10}px)`;
+    els.parallaxBg.style.transform = `scale(1.1) translate(${-x * 12}px, ${-y * 8}px)`;
   }
 
   function setActiveNav(id) {
@@ -777,7 +1007,6 @@
   }
 
   function togglePanel(name, navId) {
-    const panels = ['inventory-panel', 'map-panel', 'history-panel'];
     const target = document.getElementById(name);
     const isHidden = target.classList.contains('hidden');
     hidePanels();
@@ -793,20 +1022,18 @@
     loadSettings();
     loadState();
     fetchProducts();
+    initParticles();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('service-worker.js').catch(console.error);
     }
 
     els.startBtn.addEventListener('click', () => {
-      initAudio();
-      if (settings.audioEnabled && audioNodes.length === 0) startAmbient();
       startNewGame();
     });
 
     els.continueBtn.addEventListener('click', () => {
-      initAudio();
-      if (settings.audioEnabled && audioNodes.length === 0) startAmbient();
+      enableAudioByDefault();
       if (state.session_id) {
         showScreen('game');
         renderStats();
