@@ -384,18 +384,21 @@
 
   function toggleTTS() {
     resumeAudio();
-    settings.ttsEnabled = !settings.ttsEnabled;
-    updateTtsBtn();
-    saveSettings();
-    if (settings.ttsEnabled) {
-      if (currentAudioUrl) {
-        playSceneAudio(currentAudioUrl);
-      } else {
-        const text = els.sceneText.textContent;
-        if (text) speak(text);
-      }
-    } else {
+    // If currently speaking, stop; otherwise (re)play narration
+    if (currentTTS && !currentTTS.paused) {
       stopTTS();
+      return;
+    }
+    if (!settings.ttsEnabled) {
+      settings.ttsEnabled = true;
+      updateTtsBtn();
+      saveSettings();
+    }
+    if (currentAudioUrl) {
+      playSceneAudio(currentAudioUrl);
+    } else {
+      const text = els.sceneText.textContent;
+      if (text) speak(text);
     }
   }
 
