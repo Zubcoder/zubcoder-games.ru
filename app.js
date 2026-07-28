@@ -639,6 +639,7 @@
   }
 
   async function callApi(action) {
+    console.log('callApi', action);
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/scene`, {
@@ -756,10 +757,12 @@
   }
 
   function startNewGame() {
+    console.log('startNewGame');
     resetGame();
     enableAudioByDefault();
     callApi('начать игру');
   }
+  window.startNewGame = startNewGame;
 
   function makeChoice(action) {
     callApi(action);
