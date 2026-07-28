@@ -108,6 +108,7 @@
   let ttsGain = null;
   let ttsSource = null;
   let ttsPlaying = false;
+  let ttsAbortController = null;
   let sceneCount = 0;
 
   window.ttsDebug = {
@@ -252,6 +253,10 @@
       ttsSource = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (ttsAbortController) {
+      try { ttsAbortController.abort(); } catch (e) {}
+      ttsAbortController = null;
+    }
     ttsPlaying = false;
     currentTTS = null;
     els.ttsBtn.classList.remove('speaking');
@@ -310,17 +315,20 @@
   async function speakServer(text) {
     if (!text) return;
     stopTTS();
+    ttsAbortController = new AbortController();
     try {
       const res = await fetch(`${API_BASE}/api/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.slice(0, 5000) })
+        body: JSON.stringify({ text: text.slice(0, 5000) }),
+        signal: ttsAbortController.signal
       });
       if (!res.ok) throw new Error('tts failed');
       const data = await res.json();
       currentAudioUrl = data.audio_url;
       await playAudioUrl(currentAudioUrl);
     } catch (e) {
+      if (e.name === 'AbortError') return;
       console.error('Server TTS error', e);
       speakBrowser(text);
     }
