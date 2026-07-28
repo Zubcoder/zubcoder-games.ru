@@ -189,10 +189,11 @@
       ambientAudio.loop = true;
       ambientAudio.volume = 0.35;
       ambientAudio.preload = 'auto';
+      window.ambientAudio = ambientAudio;
     }
     ambientAudio.currentTime = 0;
     const p = ambientAudio.play();
-    if (p && p.catch) p.catch(() => {});
+    if (p && p.catch) p.catch((e) => console.warn('Ambient play failed', e));
   }
 
   function stopAmbient() {
@@ -224,13 +225,13 @@
   }
 
   async function enableAudioByDefault() {
-    await resumeAudio();
     settings.audioEnabled = true;
     settings.ttsEnabled = true;
-    saveSettings();
     updateAudioBtn();
     updateTtsBtn();
     startAmbient();
+    saveSettings();
+    await resumeAudio();
   }
 
   // TTS via Web Audio so it can start from a running AudioContext
