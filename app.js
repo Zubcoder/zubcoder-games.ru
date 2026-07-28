@@ -638,8 +638,7 @@
     }, ms);
   }
 
-  async function callApi(action) {
-    console.log('callApi', action);
+  async function callApi(action, retryCount = 1) {
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE}/api/scene`, {
@@ -661,14 +660,20 @@
         setLoading(false);
         return;
       }
+      if (response.status === 503 && retryCount > 0) {
+        showToast('AI-модель перегружена, повторная попытка...');
+        await new Promise(r => setTimeout(r, 2000));
+        return callApi(action, retryCount - 1);
+      }
       if (!response.ok) {
-        throw new Error(`Ошибка сервера: ${response.status}`);
+        const errText = await response.text().catch(() => '');
+        throw new Error(`Ошибка сервера: ${response.status}. ${errText.slice(0, 120)}`);
       }
       const data = await response.json();
       applyScene(data, action);
     } catch (err) {
       console.error(err);
-      showToast('Не удалось загрузить сцену. Проверьте соединение.');
+      showToast('Не удалось загрузить сцену. Проверьте соединение или подождите немного.');
       setLoading(false);
     }
   }
@@ -757,12 +762,10 @@
   }
 
   function startNewGame() {
-    console.log('startNewGame');
     resetGame();
     enableAudioByDefault();
     callApi('начать игру');
   }
-  window.startNewGame = startNewGame;
 
   function makeChoice(action) {
     callApi(action);
